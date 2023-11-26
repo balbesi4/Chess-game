@@ -1,31 +1,39 @@
 import sys
 import threading
+import time
 import select
 import pygame
 from constants import *
+from tkinter import *
 from game import Game
 from boardcell import BoardCell
 from move import Move
+from botik import Bot
 import socket
 
 
 class GameState:
     def __init__(self):
         self.running = True
-        self.result = ""
+        self.result = "You lost!"
 
 
-class Main:
-    def __init__(self):
+class Player:
+    def __init__(self, game_mode):
         pygame.init()
         self.server_address = ('localhost', 65432)
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client_socket.connect(self.server_address)
         self.client_socket.setblocking(False)
         self.side = ""
+        game_state = GameState()
+
+        if game_mode == "bot":
+            self.client_socket.send("play_with_bot".encode('utf-8'))
+        else:
+            self.client_socket.send("play_with_player".encode('utf-8'))
         self.wait_for_connection()
 
-        game_state = GameState()
         self.listening_messages = True
         self.message_thread = threading.Thread(target=self.check_for_incoming_messages, args=(game_state,))
         self.message_thread.start()
@@ -44,6 +52,10 @@ class Main:
         self.mainloop(game_state)
         self.make_final_window(game_state.result)
 
+    @staticmethod
+    def create(game_mode):
+        Player(game_mode)
+
     def wait_for_connection(self):
         screen = pygame.display.set_mode((400, 300))
         pygame.display.set_caption("Шахматы")
@@ -56,12 +68,12 @@ class Main:
         while waiting_for_opponent:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    waiting_for_opponent = False
+                    exit()
             try:
                 message = self.client_socket.recv(1024).decode('utf-8')
                 if "side=" in message:
                     self.side = message.split('=')[1]
-                    print(self.side)
+                    # print(self.side)
                     waiting_for_opponent = False
             except BlockingIOError:
                 pass
@@ -86,8 +98,8 @@ class Main:
     def lose(self, game_state):
         self.client_socket.send("player_resigned".encode('utf-8'))
         game_state.running = False
-        pygame.quit()
         self.listening_messages = False
+        pygame.quit()
         self.client_socket.close()
         game_state.result = "You lost!"
 
@@ -96,7 +108,7 @@ class Main:
             ready_to_read, _, _ = select.select([self.client_socket], [], [], 0)
             if ready_to_read:
                 response = self.client_socket.recv(1024).decode('utf-8')
-                print(response)
+                # print(response)
                 if response == "victory":
                     game_state.running = False
                     self.listening_messages = False
@@ -110,8 +122,10 @@ class Main:
                     if self.game.board.check_lose(self.side):
                         game_state.result = "You lost!"
                         game_state.running = False
-                        self.lose(game_state)
-                    self.game.next_turn()
+                        self.send_move_to_server("player_resigned")
+                        self.listening_messages = False
+                    else:
+                        self.game.next_turn()
 
     def send_move_to_server(self, move_message):
         self.client_socket.send(move_message.encode('utf-8'))
@@ -151,6 +165,7 @@ class Main:
 
         while game_state.running:
             game.show_bg(screen)
+            game.show_check(screen)
             game.show_last_move(screen)
             game.show_moves(screen)
             game.show_pieces(screen)
@@ -210,6 +225,32 @@ class Main:
             pygame.display.update()
 
 
+class StartWindow:
+    def __init__(self):
+        self.window = Tk()
+        self.window.resizable(False, False)
+        self.window.geometry("400x300")
+        self.window.grab_set()
+        self.draw_buttons()
+        self.window.mainloop()
+
+    def draw_buttons(self):
+        bot_button = Button(self.window, text="Играть с ботом", font=("Roboto", 14), height=2, width=16,
+                            command=lambda: self.start_game("bot"))
+        player_button = Button(self.window, text="Играть с человеком", font=("Roboto", 14), height=2, width=16,
+                               command=lambda: self.start_game("player"))
+        chess_label = Label(self.window, text="Шахматы", font=("Roboto", 30))
+        chess_label.grid(row=0, column=0, columnspan=2, padx=70, pady=50)
+        bot_button.grid(row=1, column=0, padx=5, pady=5)
+        player_button.grid(row=1, column=1, padx=5, pady=5)
+
+    def start_game(self, game_mode):
+        self.window.destroy()
+        if game_mode == "bot":
+            threading.Thread(target=Bot.create).start()
+        time.sleep(1)
+        threading.Thread(target=Player.create, args=(game_mode,)).start()
+
+
 if __name__ == "__main__":
-    main = Main()
-    # main.mainloop()
+    start_window = StartWindow()

@@ -35,3 +35,9 @@ class BoardCell:
     @staticmethod
     def get_letter(col):
         return BoardCell._number_to_letters[col]
+
+    @staticmethod
+    def get_number(letter):
+        for number in BoardCell._number_to_letters:
+            if BoardCell._number_to_letters[number] == letter:
+                return number

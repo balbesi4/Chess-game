@@ -10,6 +10,7 @@ class GameBoard:
         self.cells = [[0, 0, 0, 0, 0, 0, 0, 0] for _ in range(COLS)]
         self.last_move = None
         self._create()
+        self.is_in_check = False
         self._initialize_pieces('white')
         self._initialize_pieces('black')
 
@@ -28,7 +29,7 @@ class GameBoard:
                 if piece and piece.color == side:
                     self.calc_moves(piece, row, col)
                     all_moves += len(piece.moves)
-        print(all_moves)
+        # print(all_moves)
         return all_moves == 0
 
     def clear_all_moves(self):
@@ -91,6 +92,7 @@ class GameBoard:
                     temp_board.calc_moves(temp_piece, row, col, flag=False)
                     for move in temp_piece.moves:
                         if isinstance(move.final.piece, King):
+                            self.is_in_check = True
                             return True
         return False
 

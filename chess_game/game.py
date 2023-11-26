@@ -1,4 +1,5 @@
 import pygame
+from piece import King
 from constants import *
 from gameboard import GameBoard
 from piecemover import PieceMover
@@ -13,6 +14,18 @@ class Game:
         self.board = GameBoard()
         self.piece_mover = PieceMover()
         self.config = GameConfig()
+
+    def show_check(self, surface):
+        if self.board.is_in_check:
+            for row in range(ROWS):
+                for col in range(COLS):
+                    cell = self.board.cells[row][col]
+                    piece = cell.piece
+                    if piece and isinstance(piece, King) and piece.color == self.next_player:
+                        color = self.config.check_color.light if (row + col) % 2 == 0 else self.config.check_color.dark
+                        rect = (col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE)
+                        pygame.draw.rect(surface, color, rect)
+                        return
 
     def show_bg(self, surface):
         for row in range(ROWS):
@@ -68,6 +81,7 @@ class Game:
 
     def next_turn(self):
         self.next_player = 'white' if self.next_player == 'black' else 'black'
+        self.board.is_in_check = False
 
     def set_hover(self, row, col):
         if not (0 <= row <= 7 and 0 <= col <= 7):
